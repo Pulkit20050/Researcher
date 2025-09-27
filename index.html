@@ -3,82 +3,153 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Veriface Attendance</title>
-    
-    <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    
-    <link rel="stylesheet" href="style.css">
+    <title>Multi-Capture Face Detection</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif; display: flex; flex-direction: column;
+            align-items: center; background-color: #f0f2f5; margin: 0; padding: 20px;
+        }
+        .container {
+            position: relative; width: 640px; height: 480px;
+            margin-bottom: 20px; background: #000;
+        }
+        #webcam, #output_canvas {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+        #webcam { transform: scaleX(-1); }
+        .controls { display: flex; gap: 15px; margin-bottom: 20px; }
+        button {
+            padding: 10px 20px; font-size: 16px; cursor: pointer;
+            border: none; border-radius: 5px; color: white; transition: background-color 0.3s;
+        }
+        button:disabled { background-color: #aaa; cursor: not-allowed; }
+        #startBtn { background-color: #28a745; }
+        #captureBtn { background-color: #007bff; }
+        #uploadBtn { background-color: #ffc107; color: #212529; }
+        .status { margin-top: 10px; font-size: 16px; font-weight: bold; min-height: 20px; }
+        .photo-gallery {
+            display: flex; flex-wrap: wrap; gap: 10px; border-top: 2px solid #ccc;
+            padding-top: 20px; width: 100%; max-width: 800px;
+        }
+        .photo-gallery img {
+            width: 150px; height: 112px; border: 2px solid #ddd;
+            border-radius: 5px; object-fit: cover;
+        }
+    </style>
 </head>
-<body class="bg-gray-100">
-
-    <header><h1>Veriface</h1></header>
-
-    <nav>
-        <button class="tab-btn active" onclick="showTab('capture')">Capture</button>
-        <button class="tab-btn" onclick="showTab('absentees')">Student-List</button>
-        <button class="tab-btn" onclick="showTab('insights')">Insights</button>
-    </nav>
-
+<body>
+    <h1>Multi-Capture with Face Detection</h1>
     <div class="container">
-        <div id="capture" class="tab-content active">
-            <div class="bg-white text-center">
-                <h2>Capture Attendance</h2>
-                <p class="text-gray-600 mb-6">Click the camera to take one or more photos of the class.</p>
-                <button id="open-camera-btn" class="mx-auto transition hover:scale-105">
-                    <svg class="w-24 h-24 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" /></svg>
-                </button>
-                <div id="thumbnail-gallery"></div>
-                <button id="upload-batch-btn" class="mt-4 px-8 py-3 bg-green-600 text-white font-bold rounded-lg shadow-md hover:bg-green-700 transition disabled:bg-gray-400" disabled>
-                    Upload Attendance
-                </button>
-                <p id="message-box" class="mt-3 text-center h-5 font-semibold"></p>
-            </div>
-        </div>
-
-        <div id="absentees" class="tab-content">
-            <div class="bg-white">
-                <h2>Student Details</h2>
-                <div class="table-container">
-                    <table id="students-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Total Hours</th>
-                                <th>Present Hours</th>
-                                <th>Attendance %</th>
-                                <th>Contact</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <div id="insights" class="tab-content">
-            <div class="bg-white">
-                <h2>Attendance Overview</h2>
-                <div class="w-full max-w-md mx-auto">
-                    <canvas id="attendancePieChart"></canvas>
-                </div>
-            </div>
-        </div>
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="output_canvas" width="640" height="480"></canvas>
     </div>
-    
-    <div id="camera-modal">
-        <div id="modal-video-container">
-            <video id="video" playsinline></video>
-            <canvas id="canvas-output"></canvas>
-        </div>
-        <button id="shutter-btn"></button>
-        <button id="close-camera-btn">&times;</button>
+    <div class="controls">
+        <button id="startBtn" title="Start Camera">📷 Start Camera</button>
+        <button id="captureBtn" title="Capture Photo" disabled>Capture</button>
+        <button id="uploadBtn" title="Upload Photos" disabled>⬆️ Upload</button>
     </div>
+    <p id="status" class="status"></p>
+    <h2>Captured Photos</h2>
+    <div id="photoGallery" class="photo-gallery"></div>
 
-    <canvas id="capture-canvas" class="hidden"></canvas>
+    <script>
+        // === 1. GET HTML ELEMENTS ===
+        const videoElement = document.getElementById('webcam');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const photoGallery = document.getElementById('photoGallery');
+        const statusEl = document.getElementById('status');
+        // This URL correctly points to your local Flask server when it runs on port 3000
+        const SERVER_URL = 'http://localhost:3000/upload';
 
-    <script src="script.js"></script>
+        // === 2. MEDIAPIPE SETUP (Same as before) ===
+        const faceDetection = new FaceDetection({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}` });
+        faceDetection.setOptions({ model: 'short', minDetectionConfidence: 0.5 });
+        function onResults(results) {
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            if (results.detections) {
+                for (const detection of results.detections) {
+                    drawRectangle(canvasCtx, detection.boundingBox, { color: 'red', lineWidth: 4, fillColor: '#00000000' });
+                }
+            }
+        }
+        faceDetection.onResults(onResults);
+
+        // === 3. CAMERA LOGIC (Same as before) ===
+        let camera = null;
+        function startCamera() {
+            camera = new Camera(videoElement, {
+                onFrame: async () => { await faceDetection.send({ image: videoElement }); },
+                width: 640, height: 480
+            });
+            camera.start();
+            startBtn.textContent = 'Camera On';
+            startBtn.disabled = true;
+            captureBtn.disabled = false;
+        }
+
+        // === 4. CAPTURE PHOTO LOGIC ===
+        function capturePhoto() {
+            const imageDataUrl = canvasElement.toDataURL('image/png');
+            const img = document.createElement('img');
+            img.src = imageDataUrl;
+            img.alt = "Captured Photo";
+            photoGallery.appendChild(img);
+            uploadBtn.disabled = false; // Enable upload button after first capture
+        }
+
+        // === 5. UPLOAD PHOTOS LOGIC ===
+        async function uploadPhotos() {
+            const images = document.querySelectorAll('#photoGallery img');
+            if (images.length === 0) {
+                statusEl.textContent = 'No photos to upload.';
+                return;
+            }
+
+            statusEl.textContent = 'Uploading...';
+            uploadBtn.disabled = true;
+
+            // Collect all image data (base64 strings) from the <img> tags
+            const imageData = Array.from(images).map(img => img.src);
+
+            try {
+                const response = await fetch(SERVER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ images: imageData })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                statusEl.textContent = `✅ ${result.message}`;
+                // Optionally clear the gallery after successful upload
+                // photoGallery.innerHTML = ''; 
+
+            } catch (error) {
+                console.error('Upload failed:', error);
+                statusEl.textContent = `❌ Upload failed. See console for details.`;
+            } finally {
+                uploadBtn.disabled = false;
+            }
+        }
+
+        // === 6. EVENT LISTENERS ===
+        startBtn.addEventListener('click', startCamera);
+        captureBtn.addEventListener('click', capturePhoto);
+        uploadBtn.addEventListener('click', uploadPhotos);
+    </script>
 </body>
 </html>
